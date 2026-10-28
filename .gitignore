@@ -1,0 +1,36 @@
+# Publish only the application and its installation/licensing files.
+/*
+!/.gitignore
+!/README.md
+!/REQUIREMENTS.md
+!/LICENSE
+!/main.py
+!/pyproject.toml
+!/requirements.txt
+!/config.example.yaml
+!/.env.example
+!/src/
+!/docs/
+/docs/*
+!/docs/UPSTREAM.md
+/src/*
+!/src/career_assistant/
+
+# Never publish runtime data or generated/private files inside the package.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!/.env.example
+*.db
+*.db-*
+*.sqlite*
+*.bak
+*.bak-*
+*.log
+*.key
+*.token
+*.secret

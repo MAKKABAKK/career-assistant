@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "career-assistant"
+version = "1.0.0"
+description = "Local job discovery, analysis and application records"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+license = {file = "LICENSE"}
+
+[project.scripts]
+career-assistant = "career_assistant.cli:main"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+career_assistant = ["templates/*.html", "static/*"]

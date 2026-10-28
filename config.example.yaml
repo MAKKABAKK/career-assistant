@@ -1,0 +1,29 @@
+# Career Assistant: copy to config.yaml, then edit as needed.
+# Search preferences (keywords, location, job types) are saved in the web UI.
+# AI and SMTP credentials come from environment variables; see .env.example.
+# No credentials or personal information belong in this template.
+sources:
+  jobsdb: true
+  linkedin: true
+  indeed: true
+keywords: []
+graduate_keywords: []
+keyword_synonyms: {}
+career_stage: both
+location: "Hong Kong"
+poll_interval_minutes: 30
+human_delay:
+  min_s: 2
+  max_s: 8
+daily_limits:
+  jobsdb: 150
+  linkedin: 40
+  indeed: 40
+browser:
+  headless: true
+  cloudflare_wait_seconds: 45
+  proxy: ""
+max_job_age_days: 2
+# Daily email settings are managed in the web UI; SMTP is environment-only.
+notify:
+  channels: []

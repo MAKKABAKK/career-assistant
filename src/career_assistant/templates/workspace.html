@@ -1,0 +1,45 @@
+<!doctype html><html lang="zh-Hans"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>INT6181 · 求职助手</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='workspace.css') }}"></head><body>
+<header><strong>Career Assistant · 智能求职助手</strong><nav><a href="/jobs">岗位</a><a href="/applications">申请</a><a href="/profile">我的资料</a><a href="/settings">设置</a></nav></header><main>{% for message in get_flashed_messages() %}<p class="notice">{{message}}</p>{% endfor %}{% if session.get("form_error") %}<p class="notice" role="alert">{{session.pop("form_error")}}</p>{% endif %}
+{% from 'page.html' import token, resume_select, preference_select with context %}
+{% if page=='jobs' %}
+<h1>岗位</h1><p class="muted">浏览和刷新读取本地记录。普通岗位缓存自最近成功获取起保留 30 天；收藏及已有分析、材料、申请或待办依据会保留。缓存期限不代表招聘截止日期，实际截止时间以招聘方信息为准。</p>
+<section><h2>找工作</h2><p>无需简历或 AI 即可搜索、浏览和收藏。</p>
+{% set data=preferences[0].data if preferences else {} %}
+<form action="/preferences" method="post">{{token()}}
+<label>目标职位（每行一个，最多 7 个）<textarea name="keywords" required>{{data.get('keywords',[])|join('\n')}}</textarea></label>
+<label>地区<input name="location" value="{{data.get('location','Hong Kong')}}" required></label>
+{% for value,label in [('internship','实习'),('part time','兼职'),('full time','全职')] %}<label><input type="checkbox" name="job_types" value="{{value}}" {% if value in data.get('job_types',[]) %}checked{% endif %}>{{label}}</label>{% endfor %}
+{% for source in ['linkedin','jobsdb','indeed'] %}<label><input type="checkbox" name="sources" value="{{source}}" {% if source in data.get('sources',[]) %}checked{% endif %}>{{source}} · 列表支持 · {{'详情支持' if capabilities[source].details else '详情需手动补全'}} · {{capabilities[source].verification}}</label>{% endfor %}
+<button>开始搜索</button></form></section>
+{% if task %}<section data-poll="/tasks/{{task.id}}/status">{% include 'task_progress.html' %}</section>{% endif %}
+<section><h2>分析已有岗位</h2><form action="/jobs" method="post">{{token()}}
+<label>职位<input name="title" required></label><label>公司（可留空）<input name="company"></label>
+<label>原岗位链接（可留空）<input name="url" type="url"></label><label>完整 JD<textarea name="jd"></textarea></label>
+<input type="hidden" name="is_full" value="yes"><button>导入岗位</button></form></section>
+<form method="get"><label>检索已有岗位<input name="q" value="{{request.args.get('q','')}}"></label><button>检索</button></form>
+{% for j in jobs %}<article><h2><a href="/jobs/{{j.id}}">{{j.title}}</a></h2><p>{{j.company or '公司未提供'}} · {{'用户提供' if j.source=='manual' else j.source}} · {{'完整 JD' if j.is_full else '摘要，需补全'}}</p>
+<form action="/jobs/{{j.id}}/application" method="post">{{token()}}<input type="hidden" name="status" value="saved"><button>收藏</button></form></article>{% else %}<p>尚未保存岗位。</p>{% endfor %}
+{% elif page=='job' %}
+<h1>{{snapshot.title}}</h1><p>{{snapshot.company or '公司未提供'}} · {{'用户提供' if snapshot.source=='manual' else snapshot.source}}</p>
+{% if snapshot.url %}<a href="{{snapshot.url}}" target="_blank" rel="noopener">原岗位链接，自行投递</a>{% else %}<p>未提供原岗位链接；仍可分析和记录申请。</p>{% endif %}
+<section><form action="/jobs/{{snapshot.id}}/prepare" method="post">{{token()}}{{resume_select(resumes,selected_resume)}}{{preference_select(preferences)}}<button>分析岗位</button></form></section>
+<div id="job-progress" data-poll="{{request.path}}?fragment=progress{% if request.args.get('match') %}&match={{request.args.get('match')}}{% endif %}">{% include 'job_progress.html' %}</div>
+<section><h2>申请</h2>{% for a in applications %}<p><a href="/applications/{{a.id}}">{{labels.get(a.status,a.status)}} · 查看时间线</a></p>{% endfor %}
+<form action="/jobs/{{snapshot.id}}/application" method="post">{{token()}}<label>申请状态<select name="status">{% for key,label in labels.items() %}<option value="{{key}}">{{label}}</option>{% endfor %}</select></label><label>日期<input type="date" name="event_date"></label><label>备注／自有材料说明<textarea name="note"></textarea></label><button>保存申请记录</button></form></section>
+<details><summary>JD 原文与历史</summary><form action="/jobs/{{snapshot.id}}/complete" method="post">{{token()}}<label>修改完整 JD（保存为新版本）<textarea name="jd" required>{{snapshot.jd}}</textarea></label><button>保存 JD 新版本</button></form>{% for j in history %}<h3>{{'完整 JD' if j.is_full else '摘要'}} · {{j.created_at}}</h3><pre>{{j.jd}}</pre>{% endfor %}</details>
+<details><summary>匹配历史与依据</summary>{% for m in matches %}<p><a href="?match={{m.id}}">{{m.created_at}} 的分析</a> · 事实 {{m.resume_version_id}} · JD {{m.snapshot_id}} · 偏好 {{m.preference_id or '未设置'}}</p>{% endfor %}</details>
+{% elif page=='applications' %}<h1>申请</h1><p><a href="/jobs">从已有岗位建立记录，或导入岗位补记外部投递</a></p>{% for a in applications %}<article><a href="/applications/{{a.id}}">{{a.title}} · {{a.company}}</a><p>{{labels.get(a.status,a.status)}}</p></article>{% else %}<p>暂无申请记录。</p>{% endfor %}
+{% elif page=='settings' %}<h1>设置</h1>
+<section><h2>每日岗位邮件汇总</h2><form method="post" action="/settings/digest">{{token()}}<label><input type="checkbox" name="enabled" value="yes" {% if digest.enabled %}checked{% endif %}>启用每日邮件</label><label>每日时间（Asia/Hong_Kong）<input type="time" name="time" value="{{digest.time}}" required></label><button>保存推送设置</button></form>
+<p>调度：{{'运行中' if scheduler_running else '未运行'}} · {{'已启用' if digest.enabled else '已关闭'}}。程序须保持运行；错过时间只补当天一次。</p><p>汇总尚未进入过汇总的本地候选，每岗位自动纳入一次，不触发搜索或 AI。无新候选跳过。预览、失败或不确定的邮件保留原内容，可人工核对后重试。</p>
+{% for t in digest_tasks %}{% set r=t.result or {} %}<article><strong>{{t.payload.day}}</strong><p>{{{'queued':'等待发送','running':'正在处理','succeeded':'处理完成','failed':'失败','uncertain':'结果不确定'}.get(t.status,t.status)}} · {{{'preview':'未发送预览','accepted':'服务器接受，不代表送达','skipped':'无新候选，跳过发送','failed':'发送失败','uncertain':'结果不确定'}.get(r.get('status'), '')}}</p><p>{{r.get('detail') or r.get('error') or t.error}}</p><a href="/settings/digest/{{t.id}}/preview">查看固定汇总内容</a>{% if t.status in ['failed','uncertain'] or r.get('status')=='preview' %}<form method="post" action="/settings/digest/{{t.id}}/retry">{{token()}}<p>结果不确定时先核对收件，重发可能重复。</p><button>重试此邮件</button></form>{% endif %}</article>{% endfor %}</section><section><h2>AI</h2><p>{{'环境变量已配置；此页不检测连接，调用结果在对应分析中显示' if ai_ready else '未配置，分析将显示配置错误；岗位与申请仍可用'}}</p><p>在启动终端配置 RADAR_AI_BASE_URL、RADAR_AI_MODEL、RADAR_AI_API_KEY，重启后生效。密钥不在页面或数据库保存。</p></section><section><h2>邮件</h2><p>{{'SMTP_HOST 已配置；此页不发送测试邮件，发送结果在对应任务中显示' if smtp_ready else '未配置 SMTP，仅生成未发送预览'}}</p><p>环境变量：SMTP_HOST、SMTP_PORT、SMTP_USER、SMTP_PASSWORD、SMTP_FROM、SMTP_TO、SMTP_SSL 或 SMTP_STARTTLS。服务器接受不等于送达。</p></section>{% endif %}
+</main><script>
+document.querySelectorAll('[data-poll]').forEach(el=>{
+ let dirty=false;el.addEventListener('input',()=>dirty=true);
+ async function refresh(){if(dirty||el.contains(document.activeElement))return;try{let r=await fetch(el.dataset.poll);if(r.ok){let text=await r.text();if(text!==el.innerHTML)el.innerHTML=text}}catch(e){}}
+ setInterval(refresh,1500);
+});
+const saved={{session.pop('form_values',{})|tojson}};
+for(const [key,value] of Object.entries(saved)){document.querySelectorAll('[name="'+key+'"]').forEach(el=>{if(!['hidden','checkbox','file'].includes(el.type))el.value=value})}
+</script></body></html>

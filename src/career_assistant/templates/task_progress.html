@@ -1,0 +1,14 @@
+{% from 'page.html' import token with context %}
+{% set result=task.result or {} %}
+{% set names={'analyze':'通用报告','search':'搜索岗位','materials':'准备材料','email':'邮件','prepare':'分析岗位','match':'分析岗位'} %}
+<p><strong>{{names.get(task.kind,'处理')}}</strong> · {{'等待补充' if result.status=='waiting_input' else {'queued':'等待处理','running':'处理中','succeeded':'完成','failed':'失败','uncertain':'结果不确定'}.get(task.status,task.status)}}</p>
+{% if task.error %}<p role="alert" class="notice">{% if result.material_id %}材料草稿已保留；校验或审阅未完成，可编辑草稿或重试失败步骤。{% else %}{{task.error|replace('DefiniteTaskFailure: ', '')|replace('AIError: ', '')|replace('ValueError: ', '')}}{% endif %}</p><details><summary>失败原因与技术详情</summary><p>{{task.error}}</p></details>{% endif %}
+{% if result.message %}<p>{{result.message}}</p>{% endif %}
+{% for source,outcome in result.get('sources',{}).items() %}<p>{{source}}：{{'成功' if outcome.status=='succeeded' else '失败'}} · {{outcome.get('count','')}} {{outcome.get('error','')}}</p>{% endfor %}
+{% if task.kind=='email' %}<p>{{{'preview':'未发送，仅预览','accepted':'服务器已接受，未验证送达','uncertain':'结果不确定，请先核对','failed':'发送失败'}.get(result.status,'')}}</p>{% if result.html %}<details><summary>邮件预览</summary><pre>{{result.html}}</pre></details>{% endif %}{% endif %}
+{% if task.kind=='analyze' %}<p>简历事实：{{'已保存，可用于匹配' if facts_available else '尚无可用事实'}}</p><a href="/resumes/{{task.payload.resume_id}}">查看事实／报告或编辑事实</a><p>有效事实独立保存；通用报告失败不阻止匹配。</p>{% endif %}
+{% if result.status=='waiting_input' %}<form action="/tasks/{{task.id}}/inputs" method="post">{{token()}}<p>集中补充当前材料所需信息；留空即跳过，将省略无依据内容。</p>{% for q in result.questions %}<label>{{q}}<textarea name="answer_{{loop.index0}}"></textarea></label>{% endfor %}<button>保存并继续（留空项跳过）</button></form>{% endif %}
+{% if result.material_id %}<p><a href="/materials/{{result.material_id}}">查看、编辑或导出材料／问题草稿</a></p>{% endif %}
+{% if task.kind!='fill' and (task.status in ['failed','uncertain'] or result.outcome=='partial' or result.status=='preview') %}<form action="/tasks/{{task.id}}/retry" method="post">{{token()}}{% if task.status=='uncertain' %}<p>请先核对外部结果；重试可能重复发送。</p><input type="hidden" name="confirmed" value="yes">{% endif %}<button>重试失败步骤</button></form>{% endif %}
+
+{% if task.kind=='search' and result.snapshot_ids %}<p>已获取岗位：</p>{% for sid in result.snapshot_ids %}<a href="/jobs/{{sid}}">查看候选岗位 {{loop.index}}</a> {% endfor %}{% endif %}
